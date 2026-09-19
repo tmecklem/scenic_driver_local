@@ -3,6 +3,7 @@
 #include <math.h>
 
 #include "cairo_ctx.h"
+#include "cairo_shape.h"
 #include "comms.h"
 #include "font.h"
 #include "font_ops.h"
@@ -263,25 +264,16 @@ void script_ops_draw_text(void* v_ctx,
   }
 
   scenic_cairo_ctx_t* p_ctx = (scenic_cairo_ctx_t*)v_ctx;
+  if (!p_ctx->hb_font) return;
 
-  cairo_glyph_t* glyphs = NULL;
-  int glyph_count;
-  cairo_text_cluster_t* clusters = NULL;
-  int cluster_count;
-  cairo_text_cluster_flags_t cluster_flags;
+  shaped_text_t shaped;
+  if (shape_text(p_ctx->hb_font, p_ctx->font_size, text, size, &shaped) != 0) {
+    log_error("%s: shape_text failed", __func__);
+    return;
+  }
 
-  cairo_scaled_font_t* scaled_font = cairo_get_scaled_font(p_ctx->cr);
-  cairo_status_t status = cairo_scaled_font_text_to_glyphs(scaled_font,
-                                                           0, 0,
-                                                           text, size,
-                                                           &glyphs, &glyph_count,
-                                                           &clusters, &cluster_count,
-                                                           &cluster_flags);
   cairo_font_extents_t font_extents;
-  cairo_scaled_font_extents(scaled_font, &font_extents);
-
-  cairo_text_extents_t text_extents;
-  cairo_scaled_font_glyph_extents(scaled_font, glyphs, glyph_count, &text_extents);
+  cairo_font_extents(p_ctx->cr, &font_extents);
 
   float align_offset = 0;
   switch (p_ctx->text_align) {
@@ -289,10 +281,10 @@ void script_ops_draw_text(void* v_ctx,
     align_offset = 0;
     break;
   case TEXT_ALIGN_CENTER:
-    align_offset = -(text_extents.width / 2);
+    align_offset = -(shaped.advance / 2);
     break;
   case TEXT_ALIGN_RIGHT:
-    align_offset = -(text_extents.width);
+    align_offset = -(shaped.advance);
     break;
   }
 
@@ -315,24 +307,10 @@ void script_ops_draw_text(void* v_ctx,
   cairo_save(p_ctx->cr);
   cairo_translate(p_ctx->cr, align_offset, base_offset);
   cairo_set_source(p_ctx->cr, p_ctx->pattern.fill);
-
-  if (status == CAIRO_STATUS_SUCCESS) {
-    int glyph_index = 0;
-    int byte_index = 0;
-    for (int i = 0; i < cluster_count; i++) {
-      cairo_text_cluster_t* cluster = &clusters[i];
-      cairo_glyph_t* cluster_glyphs = &glyphs[glyph_index];
-
-      cairo_scaled_font_glyph_extents(scaled_font, cluster_glyphs, cluster->num_glyphs, &text_extents);
-      cairo_show_glyphs(p_ctx->cr, cluster_glyphs, cluster->num_glyphs);
-
-      glyph_index += cluster->num_glyphs;
-      byte_index += cluster->num_bytes;
-    }
-  } else {
-    log_error("%s: cairo_scaled_font_text_to_glyphs: error %d", __func__, status);
-  }
+  cairo_show_glyphs(p_ctx->cr, shaped.glyphs, shaped.count);
   cairo_restore(p_ctx->cr);
+
+  shaped_text_free(&shaped);
 }
 
 static void draw_sprite(scenic_cairo_ctx_t* p_ctx,
@@ -975,6 +953,7 @@ void script_ops_font(void* v_ctx,
   if (!font_data) return;
 
   cairo_set_font_face(p_ctx->cr, font_data->font_face);
+  p_ctx->hb_font = font_data->hb_font;
 }
 
 void script_ops_font_size(void* v_ctx,

@@ -3,6 +3,7 @@
 #include <cairo.h>
 #include <ft2build.h>
 #include FT_FREETYPE_H
+#include <hb.h>
 #include "script_ops.h"
 
 typedef struct {
@@ -14,6 +15,7 @@ typedef struct pattern_stack_t_ {
   fill_stroke_pattern_t pattern;
   text_align_t text_align;
   text_base_t text_base;
+  hb_font_t* hb_font;
   struct pattern_stack_t_* next;
 } pattern_stack_t;
 
@@ -26,6 +28,7 @@ typedef struct {
 typedef struct {
   int id;
   cairo_font_face_t* font_face;
+  hb_font_t* hb_font;
 } font_data_t;
 
 typedef struct {
@@ -34,6 +37,7 @@ typedef struct {
   float font_size;
   text_align_t text_align;
   text_base_t text_base;
+  hb_font_t* hb_font;
   cairo_surface_t* surface;
   cairo_t* cr;
   pattern_stack_t* pattern_stack_head;

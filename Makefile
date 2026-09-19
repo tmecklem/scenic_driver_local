@@ -1,5 +1,6 @@
 MIX = mix
 PREFIX = $(MIX_APP_PATH)/priv
+OBJ_DIR = $(MIX_APP_PATH)/obj
 DEFAULT_TARGETS ?= $(PREFIX) $(PREFIX)/scenic_driver_local
 
 $(info SCENIC_LOCAL_TARGET: $(SCENIC_LOCAL_TARGET))
@@ -158,6 +159,22 @@ $(info )
 
 endif
 
+HB_SRC = c_src/harfbuzz/src/harfbuzz.cc
+HB_CXXFLAGS = -std=c++17 -O2 -fPIC -fno-exceptions -fno-rtti -fno-threadsafe-statics
+
+ifneq (,$(findstring linux,$(shell $(CC) -dumpmachine)))
+	CXX_RUNTIME = -lstdc++
+else
+	CXX_RUNTIME = -lc++
+endif
+
+ifneq (,$(filter cairo-%,$(SCENIC_LOCAL_TARGET)))
+	CFLAGS += -Ic_src/harfbuzz/src
+	DEVICE_SRCS += c_src/device/cairo/cairo_shape.c
+	EXTRA_OBJS += $(OBJ_DIR)/harfbuzz.o
+	LDFLAGS += $(CXX_RUNTIME)
+endif
+
 CFLAGS += \
 	-Ic_src \
 	-Ic_src/device \
@@ -182,11 +199,27 @@ all: $(DEFAULT_TARGETS)
 $(PREFIX):
 	mkdir -p $@
 
-$(PREFIX)/scenic_driver_local: $(SRCS)
-	$(CC) $(CFLAGS) -o $@ $(SRCS) $(LDFLAGS)
+$(PREFIX)/scenic_driver_local: $(SRCS) $(EXTRA_OBJS)
+	$(CC) $(CFLAGS) -o $@ $(SRCS) $(EXTRA_OBJS) $(LDFLAGS)
+
+$(OBJ_DIR)/harfbuzz.o: $(HB_SRC)
+	mkdir -p $(OBJ_DIR)
+	$(CXX) $(CXXFLAGS) $(HB_CXXFLAGS) -c $(HB_SRC) -o $@
+
+TEST_DIR = _build/c_test
+
+$(TEST_DIR)/harfbuzz.o: $(HB_SRC)
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(HB_CXXFLAGS) -c $(HB_SRC) -o $@
+
+test_shape: $(TEST_DIR)/harfbuzz.o
+	$(CC) -std=gnu99 -O1 -Wall -Ic_src/device/cairo -Ic_src/harfbuzz/src `pkg-config --cflags cairo` \
+		-o $(TEST_DIR)/shape_test test/c/shape_test.c c_src/device/cairo/cairo_shape.c \
+		$(TEST_DIR)/harfbuzz.o -lm $(CXX_RUNTIME)
+	$(TEST_DIR)/shape_test test/c/fixtures/AtkinsonHyperlegibleNext-SemiBold.ttf
 
 clean:
-	$(RM) -rf $(PREFIX)
+	$(RM) -rf $(PREFIX) $(OBJ_DIR)
 
-.PHONY: all clean calling_from_make
+.PHONY: all clean calling_from_make test_shape
 

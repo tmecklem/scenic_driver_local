@@ -2,6 +2,7 @@
 #include "font_ops.h"
 
 #include <cairo-ft.h>
+#include "cairo_shape.h"
 
 static int maxi(int a, int b) { return a > b ? a : b; }
 
@@ -75,6 +76,7 @@ int32_t font_ops_create(void* v_ctx, font_t* p_font, uint32_t size)
 
   font_data_t* font_data = alloc_font_data(p_ctx, font_face);
   if (!font_data) return -1;
+  font_data->hb_font = shape_font_create(data, size);
 
   return font_data->id;
 }
