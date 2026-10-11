@@ -14,11 +14,15 @@
 #  copy is done.
 #
 #  Nothing here looks at what changed between frames: that is the reader's.
+#
+#  Unlike the other targets, this one waits for its caller in poll() and uses
+#  no processor time while nothing is drawn.
 */
 
 #include <cairo.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,6 +32,7 @@
 #include "cairo_ctx.h"
 #include "comms.h"
 #include "device.h"
+#include "image.h"
 #include "scenic_ops.h"
 
 typedef struct {
@@ -40,6 +45,7 @@ typedef struct {
 static cairo_mem_t g_cairo_mem = {NULL, 0, NULL, -1};
 
 extern device_opts_t g_opts;
+extern device_info_t g_device_info;
 
 int device_init(const device_opts_t* p_opts,
                 device_info_t* p_info,
@@ -139,7 +145,22 @@ void device_end_render(driver_data_t* p_data)
   frame_ready();
 }
 
+// scenic_loop looks at its input every 32 microseconds whether or not there
+// is any, which costs a small device a fifth of a core while nothing is
+// drawn. This waits for the caller instead, and then takes what it sent the
+// same way.
 void device_loop(driver_data_t* p_data)
 {
-  scenic_loop(p_data);
+  struct pollfd caller = {.fd = STDIN_FILENO, .events = POLLIN, .revents = 0};
+
+  send_ready();
+
+  while (p_data->keep_going && !isCallerDown()) {
+    if (poll(&caller, 1, -1) > 0 && (caller.revents & POLLIN)) {
+      handle_stdio_in(p_data);
+    }
+  }
+
+  reset_images(p_data->v_ctx);
+  device_close(&g_device_info);
 }
