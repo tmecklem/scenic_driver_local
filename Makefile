@@ -75,6 +75,16 @@ else ifeq ($(SCENIC_LOCAL_TARGET),cairo-fb)
 		$(CAIRO_COMMON_SRCS) \
 		c_src/device/cairo/cairo_fb.c
 
+# Added by Tim Mecklem's fork: render into memory another program can read.
+else ifeq ($(SCENIC_LOCAL_TARGET),cairo-mem)
+	CFLAGS ?= -O2 -Wall -Wextra -Wno-unused-parameter
+	CFLAGS += `pkg-config --cflags freetype2 cairo` -std=gnu99
+	LDFLAGS += `pkg-config --libs freetype2 cairo` -lm
+
+	DEVICE_SRCS += \
+		$(CAIRO_COMMON_SRCS) \
+		c_src/device/cairo/cairo_mem.c
+
 else ifeq ($(SCENIC_LOCAL_TARGET),glfw)
 $(info )
 $(info **********************************************************************************)

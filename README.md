@@ -119,3 +119,13 @@ See the "Targets" section above
 
 Documentation can be found at [https://hexdocs.pm/scenic_driver_local](https://hexdocs.pm/scenic_driver_local).
 
+
+## The `cairo-mem` target (this fork only)
+
+This branch of the fork adds one render target that upstream does not have. With `SCENIC_LOCAL_TARGET=cairo-mem` the driver renders with cairo into a file another program can map or read, and writes a byte to a named pipe when a frame is finished:
+
+```elixir
+[module: Scenic.Driver.Local, window: [fbdev: "/tmp/scenic/frame"]]
+```
+
+The frame is `height` rows of `width` pixels, four bytes a pixel (cairo's ARGB32 in the machine's byte order), and the pipe is the same path with `.ready` added; the reader makes the pipe. The whole addition is `c_src/device/cairo/cairo_mem.c`, a branch in the `Makefile`, and the `fbdev` key in the driver's `window` options. It needs cairo and freetype, as the other cairo targets do.

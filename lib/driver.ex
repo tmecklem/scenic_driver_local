@@ -14,9 +14,11 @@ defmodule Scenic.Driver.Local do
     orientation: [type: {:in, [:normal, :left, :right, :upside_down]}, default: :normal]
   ]
 
+  # `fbdev` added by Tim Mecklem's fork: init/2 already read it, but the schema refused it.
   @window_schema [
     title: [type: :string, default: "Scenic Window"],
-    resizeable: [type: :boolean, default: false]
+    resizeable: [type: :boolean, default: false],
+    fbdev: [type: :string]
   ]
 
   @opts_schema [
